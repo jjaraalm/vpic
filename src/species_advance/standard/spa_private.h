@@ -41,7 +41,7 @@ typedef struct advance_p_pipeline_args {
   int                                  nx;       // x-mesh resolution
   int                                  ny;       // y-mesh resolution
   int                                  nz;       // z-mesh resolution
- 
+
   PAD_STRUCT( 6*SIZEOF_MEM_PTR + 5*sizeof(float) + 5*sizeof(int) )
 
 } advance_p_pipeline_args_t;
@@ -82,6 +82,24 @@ typedef struct energy_p_pipeline_args {
 } energy_p_pipeline_args_t;
 
 PROTOTYPE_PIPELINE( energy_p, energy_p_pipeline_args_t );
+
+///////////////////////////////////////////////////////////////////////////////
+// hydro_p_pipeline interface
+
+typedef struct hydro_p_pipeline_args {
+
+  MEM_PTR( const species_t,      128 ) sp;      // Species array
+  MEM_PTR( const interpolator_t, 128 ) f;       // Interpolator array
+  MEM_PTR( /**/  hydro_t,        128 ) h;       // Hydro values
+  float                                qdt_2mc; // Particle/field coupling
+  float                                msp;     // Species particle rest mass
+  int                                  np;      // Number of particles
+
+  PAD_STRUCT( 3*SIZEOF_MEM_PTR + 2*sizeof(float) + sizeof(int) )
+
+} hydro_p_pipeline_args_t;
+
+PROTOTYPE_PIPELINE( hydro_p, hydro_p_pipeline_args_t );
 
 ///////////////////////////////////////////////////////////////////////////////
 // sort_p_pipeline interface

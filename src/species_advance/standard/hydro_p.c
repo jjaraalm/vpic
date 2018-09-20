@@ -1,7 +1,6 @@
-// FIXME: THREAD THIS! HYDRO MEM SEMANTICS WILL NEED UPDATING.
 // FIXME: V4 ACCELERATE THIS.  COULD BE BASED OFF ENERGY_P.
 
-/* 
+/*
  * Written by:
  *   Kevin J. Bowers, Ph.D.
  *   Plasma Physics Group (X-1)
@@ -20,37 +19,44 @@
 // positions. No effort is made to fix up edges of the computational
 // domain.  All particles on the list must be inbounds.  Note, the
 // hydro jx,jy,jz are for diagnostic purposes only; they are not
-// accumulated with a charge conserving algorithm.
+// accumulateEd with a charge conserving algorithm.
 
+// Pipelined, but not vectorized.
 void
-accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
-                    const species_t            * RESTRICT sp,
-                    const interpolator_array_t * RESTRICT ia ) {
-  /**/  hydro_t        * RESTRICT ALIGNED(128) h;
-  const particle_t     * RESTRICT ALIGNED(128) p;
-  const interpolator_t * RESTRICT ALIGNED(128) f;
+accumulate_hydro_p_pipeline( hydro_p_pipeline_args_t * RESTRICT args,
+                             int pipeline_rank,
+                             int n_pipeline ) {
   float c, qsp, mspc, qdt_2mc, qdt_4mc2, r8V;
   int np, stride_10, stride_21, stride_43;
 
   float dx, dy, dz, ux, uy, uz, w, vx, vy, vz, ke_mc;
   float w0, w1, w2, w3, w4, w5, w6, w7, t;
-  int i, n;
+  int i, n, n1, n0;
 
-  if( !ha || !sp || !ia || ha->g!=sp->g || ha->g!=ia->g )
-    ERROR(( "Bad args" ));
+  const species_t      * RESTRICT              sp = args->sp;
+  const grid_t         * RESTRICT              g  = sp->g;
+  /**/  hydro_t        * RESTRICT ALIGNED(128) h  = args->h;
+  const particle_t     * RESTRICT ALIGNED(128) p  = sp->p;
+  const interpolator_t * RESTRICT ALIGNED(128) f  = args->f;
 
-  h = ha->h;
-  p = sp->p;
-  f = ia->i;
+  // Determine which particles this pipeline processes and which hydro
+  // array to accumulate into.
+  DISTRIBUTE( args->np, 16, pipeline_rank, n_pipeline, n0, n1 ); n1 += n0;
+
+  //NOTE: Implicit assumption that host is always rank 0. This is true for the
+  //      current pthread implementation, but is it really worth the risk here?
+  //      The advantage is not having to allocate an entire hydro array for < 4
+  //      particles.
+  if( pipeline_rank < n_pipeline )
+    h += (g->nv)*pipeline_rank;
 
   c        = sp->g->cvac;
   qsp      = sp->q;
-  mspc     = sp->m*c;
-  qdt_2mc  = (qsp*sp->g->dt)/(2*mspc);
+  mspc     = args->msp*c;
+  qdt_2mc  = args->qdt_2mc;
   qdt_4mc2 = qdt_2mc / (2*c);
   r8V      = sp->g->r8V;
 
-  np        = sp->np;
   stride_10 = VOXEL(1,0,0, sp->g->nx,sp->g->ny,sp->g->nz) -
               VOXEL(0,0,0, sp->g->nx,sp->g->ny,sp->g->nz);
   stride_21 = VOXEL(0,1,0, sp->g->nx,sp->g->ny,sp->g->nz) -
@@ -58,7 +64,7 @@ accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
   stride_43 = VOXEL(0,0,1, sp->g->nx,sp->g->ny,sp->g->nz) -
               VOXEL(1,1,0, sp->g->nx,sp->g->ny,sp->g->nz);
 
-  for( n=0; n<np; n++ ) {
+  for( n=n0; n<n1; n++ ) {
 
     // Load the particle
     dx = p[n].dx;
@@ -69,7 +75,7 @@ accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
     uy = p[n].uy;
     uz = p[n].uz;
     w  = p[n].w;
-    
+
     // Half advance E
     ux += qdt_2mc*((f[i].ex+dy*f[i].dexdy) + dz*(f[i].dexdz+dy*f[i].d2exdydz));
     uy += qdt_2mc*((f[i].ey+dz*f[i].deydz) + dx*(f[i].deydx+dz*f[i].d2eydzdx));
@@ -130,7 +136,7 @@ accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
     w2 *= dz;       // w2 = (1/8)(w/V)(1-x)(1+y)(1-z) = (w/V) trilin_6 *Done
     w3 *= dz;       // w3 = (1/8)(w/V)(1+x)(1+y)(1-z) = (w/V) trilin_7 *Done
 
-    // Accumulate the hydro fields
+    // ACCUMULATE the hydro fields
 #   define ACCUM_HYDRO( wn)                             \
     t  = qsp*wn;        /* t  = (qsp w/V) trilin_n */   \
     h[i].jx  += t*vx;                                   \
@@ -163,4 +169,48 @@ accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
 
 #   undef ACCUM_HYDRO
   }
+}
+
+void
+accumulate_hydro_p( hydro_array_t              * RESTRICT ha,
+                    const species_t            * RESTRICT sp,
+                    const interpolator_array_t * RESTRICT ia ) {
+
+  if( !ha || !sp || !ia || ha->g!=sp->g || ha->g!=ia->g )
+    ERROR(( "Bad args" ));
+
+  int rank, v, pv;
+  /**/  hydro_t *          ALIGNED(128) ph;
+  /**/  hydro_t * RESTRICT ALIGNED(128) h = ha->h;
+  const grid_t  * RESTRICT              g = sp->g;
+
+  const int nv  = g->nv;
+  const int pnv = nv*N_PIPELINE;
+
+  DECLARE_ALIGNED_ARRAY(hydro_p_pipeline_args_t, 128, args, 1);
+  MALLOC_ALIGNED(ph, pnv, 128);
+  CLEAR(ph, pnv);
+
+  args->sp      = sp;
+  args->f       = ia->i;
+  args->h       = ph;
+  args->qdt_2mc = (sp->q*sp->g->dt)/(2*sp->m*sp->g->cvac);
+  args->msp     = sp->m;
+  args->np      = sp->np;
+
+  EXEC_PIPELINES(accumulate_hydro_p, args, 0);
+  WAIT_PIPELINES();
+
+  // Reduce to the original hydro array.
+  #define ACCUMULATE(x) h[v].x += ph[pv].x;
+  for (v=0, pv=0 ; pv < pnv ; ++pv, ++v) {
+    if(v >= nv) v = 0;
+    ACCUMULATE(jx) ;  ACCUMULATE(jy) ;  ACCUMULATE(jz) ; ACCUMULATE(rho) ;
+    ACCUMULATE(px) ;  ACCUMULATE(py) ;  ACCUMULATE(pz) ; ACCUMULATE(ke) ;
+    ACCUMULATE(txx) ; ACCUMULATE(tyy) ; ACCUMULATE(tzz) ;
+    ACCUMULATE(tyz) ; ACCUMULATE(tzx) ; ACCUMULATE(txy) ;
+  }
+  #undef ACCUMULATE
+
+  FREE_ALIGNED(ph);
 }
