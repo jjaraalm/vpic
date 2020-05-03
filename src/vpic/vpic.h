@@ -515,6 +515,16 @@ protected:
      return find_species_id( id, species_list );
   }
 
+	inline hydro_t *
+	compute_hydro( species_t * sp ) {
+		if (hydro_array->sp != sp || hydro_array->last_updated != step()) {
+			clear_hydro_array( hydro_array );
+			accumulate_hydro_p( hydro_array, sp, interpolator_array );
+			synchronize_hydro_array( hydro_array );
+		}
+		return hydro_array->h;
+	}
+
   ///////////////////
   // Particle helpers
 

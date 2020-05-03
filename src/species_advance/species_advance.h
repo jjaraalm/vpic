@@ -1,4 +1,4 @@
-/* 
+/*
  * Written by:
  *   Kevin J. Bowers, Ph.D.
  *   Plasma Physics Group (X-1)
@@ -139,7 +139,7 @@ accumulate_rhob( field_t * RESTRICT ALIGNED(128) f,
 
 void
 accumulate_hydro_p( hydro_array_t * RESTRICT ha,
-                    const species_t * RESTRICT sp,
+                    species_t * RESTRICT sp,
                     const interpolator_array_t * RESTRICT ia );
 
 void

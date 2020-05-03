@@ -40,6 +40,8 @@ checkpt_hydro_array( const hydro_array_t * ha )
                    (size_t) ( ha->n_pipeline + 1 ) * (size_t) ha->stride,
                    128 );
 
+  CHECKPT_PTR( ha->sp );
+
   CHECKPT_PTR( ha->g );
 }
 
@@ -51,6 +53,8 @@ restore_hydro_array( void )
   RESTORE( ha );
 
   RESTORE_ALIGNED( ha->h );
+
+  RESTORE_PTR( ha->sp );
 
   RESTORE_PTR( ha->g );
 
@@ -76,9 +80,11 @@ new_hydro_array( grid_t * g )
 
   MALLOC( ha, 1 );
 
-  ha->n_pipeline = ha_n_pipeline();
-  ha->stride     = POW2_CEIL( g->nv, 2 );
-  ha->g          = g;
+  ha->n_pipeline   = ha_n_pipeline();
+  ha->stride       = POW2_CEIL( g->nv, 2 );
+  ha->last_updated = -1;
+  ha->sp           = NULL;
+  ha->g            = g;
 
   MALLOC_ALIGNED( ha->h,
                   (size_t) ( ha->n_pipeline + 1 ) * (size_t) ha->stride,

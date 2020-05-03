@@ -13,6 +13,9 @@
 #include "../field_advance/field_advance.h"
 // FIXME: SHOULD INCLUDE SPECIES_ADVANCE TOO ONCE READY
 
+// FIXME: Silly forward declaration
+typedef struct species species_t;
+
 //----------------------------------------------------------------------------//
 // We want to conditionally define pad sizes for various structs so they will
 // be properly aligned for performance and also for various intrinsics calls
@@ -170,7 +173,7 @@ reduce_accumulator_array( accumulator_array_t * RESTRICT a );
 // accumulators have been reduced into the host accumulator.
 
 void
-unload_accumulator_array( /**/  field_array_t       * RESTRICT fa, 
+unload_accumulator_array( /**/  field_array_t       * RESTRICT fa,
                           const accumulator_array_t * RESTRICT aa );
 
 END_C_DECLS
@@ -194,8 +197,10 @@ typedef struct hydro
 typedef struct hydro_array
 {
   hydro_t * ALIGNED(128) h;
-  int n_pipeline; // Number of pipelines supported by this hydro
-  int stride;     // Stride be each pipeline's hydro array
+  int n_pipeline;   // Number of pipelines supported by this hydro
+  int stride;       // Stride be each pipeline's hydro array
+  int last_updated; // Step when the hydro array was last updated
+  species_t * sp;   // Species that was accumulated into the hydro array
   grid_t * g;
 } hydro_array_t;
 

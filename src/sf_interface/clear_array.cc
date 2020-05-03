@@ -35,4 +35,8 @@ clear_hydro_array( hydro_array_t * RESTRICT ha )
 
   // Conditionally execute this when more abstractions are available.
   clear_hydro_array_pipeline( ha );
+
+  ha->last_updated = ha->g->step;
+  ha->sp = NULL;
+
 }
