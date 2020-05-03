@@ -32,8 +32,8 @@ typedef struct omp_container
   //boot gets the number of pipelines from the cmd line
   //and passes it on to the EXEC_PIPELINS macro eventually
   void
-  (*boot)( int * pargc,
-	   char *** pargv );
+  (*boot)( int pipelines,
+           int dispatch_to_host );
 } omp_container_t;
 
 BEGIN_C_DECLS
@@ -42,4 +42,4 @@ extern omp_container_t omp_helper;
 
 END_C_DECLS
 
-#endif // _pipelines_openmp_h_ 
+#endif // _pipelines_openmp_h_

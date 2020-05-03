@@ -166,19 +166,14 @@ restore_thread( void ) {
  ***************************************************************************/
 
 static void
-thread_boot( int * pargc,
-             char *** pargv ) {
-  int i, n_pipeline;
+thread_boot( int n_pipeline,
+             int dispatch_to_host ) {
+  int i;
 
   // Check if arguments are valid and dispatcher isn't already initialized
 
   if( thread.n_pipeline != 0 ) ERROR(( "Halt the thread dispatcher first!" ));
-
-  // Attempt to detect if any old-style arguments exist, and if so warn the user.
-  detect_old_style_arguments(pargc, pargv);
-
-  n_pipeline       = strip_cmdline_int( pargc, pargv, "--tpp",              1 );
-  Dispatch_To_Host = strip_cmdline_int( pargc, pargv, "--dispatch_to_host", 1 );
+  Dispatch_To_Host = dispatch_to_host;
 
   if( n_pipeline<1 || n_pipeline>MAX_PIPELINE )
     ERROR(( "Invalid number of pipelines requested (%i)", n_pipeline ));

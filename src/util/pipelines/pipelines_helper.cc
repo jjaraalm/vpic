@@ -7,22 +7,15 @@
 // omp_boot - mimics thread_boot - see 'pipelines_thread.c'
 
 static void
-omp_boot( int * pargc,
-	  char *** pargv )
+omp_boot( int n_pipeline, int dispatch_to_host )
 {
-  int n_pipeline;
 
   if ( omp_helper.n_pipeline != 0 ) ERROR(( "OMP container has already booted" ));
-
-  n_pipeline = strip_cmdline_int( pargc, pargv, "--tpp", 1 );
 
   omp_set_num_threads( n_pipeline );
 
   if ( n_pipeline < 1 || n_pipeline > MAX_PIPELINE )
     ERROR(( "Invalid number of pipelines requested (%i)", n_pipeline ));
-
-  //initialize dispatch_to_host
-  int dispatch_to_host = strip_cmdline_int( pargc, pargv, "--dispatch_to_host", 1 );
 
   //assign our helper values
   omp_helper.n_pipeline       = n_pipeline;

@@ -26,10 +26,9 @@ restore_serial( void ) {
 /*****************************************************************************/
 
 static void
-serial_boot( int * pargc,
-             char *** pargv ) {
+serial_boot( int pipelines, int dispatch_to_host ) {
   if( serial.n_pipeline!=0 ) ERROR(( "Serial dispatcher already booted!" ));
-  serial.n_pipeline = strip_cmdline_int(pargc,pargv,"--serial.n_pipeline",1);
+  serial.n_pipeline = pipelines;
   if( serial.n_pipeline<1 || serial.n_pipeline>MAX_PIPELINE )
     ERROR(( "Invalid number of pipelines requested (%i)", serial.n_pipeline ));
   REGISTER_OBJECT( &serial, checkpt_serial, restore_serial, NULL );

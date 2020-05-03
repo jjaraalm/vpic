@@ -11,6 +11,42 @@ uptime( void ) {
   return time_sum/(double)world_size - _boot_timestamp;
 }
 
+int
+boot_threads( int serial_pipelines,
+              int thread_pipelines,
+              int dispatch_to_host ) {
+
+#if defined(VPIC_USE_PTHREADS)
+
+  serial.boot(serial_pipelines, dispatch_to_host);
+  thread.boot(thread_pipelines, dispatch_to_host);
+  return thread.n_pipeline;
+
+#elif defined(VPIC_USE_OPENMP)
+
+  omp_helper.boot(thread_pipelines, dispatch_to_host);
+  return omp_get_num_threads();
+
+#else
+
+  #error "Either VPIC_USE_PTHREADS or VPIC_USE_OPENMP must be defined."
+
+#endif
+
+}
+
+void
+halt_threads() {
+
+#if defined(VPIC_USE_PTHREADS)
+
+    thread.halt();
+    serial.halt();
+
+#endif
+
+}
+
 void
 boot_services( int * pargc,
                char *** pargv ) {
@@ -28,23 +64,21 @@ boot_services( int * pargc,
 
   // Boot up the communications layer
 
-#if defined(VPIC_USE_PTHREADS)
-  #if defined(VPIC_SWAP_MPI_PTHREAD_INIT)
-    boot_mp( pargc, pargv );      // Boot communication layer first.
-    serial.boot( pargc, pargv );
-    thread.boot( pargc, pargv );
-  #else
-    serial.boot( pargc, pargv );
-    thread.boot( pargc, pargv );
-    boot_mp( pargc, pargv );      // Boot communication layer last.
-  #endif
+  detect_old_style_arguments(pargc, pargv);
+  int tpp      = strip_cmdline_int( pargc, pargv, "--tpp",               1 );
+  int serial   = strip_cmdline_int( pargc, pargv, "--serial.n_pipeline", 1 );
+  int dispatch = strip_cmdline_int( pargc, pargv, "--dispatch_to_host",  1 );
+  int num_threads;
 
-  int num_threads = thread.n_pipeline;
+#if defined(VPIC_USE_PTHREADS) && !defined(VPIC_SWAP_MPI_PTHREAD_INIT)
 
-#elif defined(VPIC_USE_OPENMP)
-  boot_mp( pargc, pargv );        // Boot communication layer first.
-  omp_helper.boot( pargc, pargv );
-  int num_threads = omp_get_num_threads();
+  num_threads = boot_threads(serial, tpp, dispatch);
+  boot_mp( pargc, pargv );      // Boot communication layer last.
+
+#else
+
+  boot_mp( pargc, pargv );      // Boot communication layer first.
+  num_threads = boot_threads(serial, tpp, dispatch);
 
 #endif
 
@@ -68,22 +102,18 @@ halt_services( void )
 {
   _boot_timestamp = 0;
 
-#if defined(VPIC_USE_PTHREADS)
-  #if defined(VPIC_SWAP_MPI_PTHREAD_INIT)
-    thread.halt();
-    serial.halt();
-    halt_mp();
-  #else
-    halt_mp();
-    thread.halt();
-    serial.halt();
-  #endif
+#if defined(VPIC_USE_PTHREADS) && !defined(VPIC_SWAP_MPI_PTHREAD_INIT)
 
-#elif defined(VPIC_USE_OPENMP)
+  halt_mp();
+  halt_threads();
+
+#else
+
+  halt_threads();
   halt_mp();
 
 #endif
 
   halt_checkpt();
-}
 
+}
