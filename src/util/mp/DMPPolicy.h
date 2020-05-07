@@ -118,13 +118,16 @@ struct DMPPolicy {
 
   inline void
   halt_mp( void ) {
+    int finalized;
     UNREGISTER_OBJECT( &__world );
     TRAP( MPI_Comm_free( &__world.comm ) );
     __world.parent = NULL, __world.color = 0, __world.key = 0;
     __world.comm = MPI_COMM_SELF;
     _world_size = 1;
     _world_rank = 0;
-    TRAP( MPI_Finalize() );
+    TRAP( MPI_Finalized(&finalized) );
+    if( !finalized )
+      TRAP( MPI_Finalize() );
   }
 
   inline void
