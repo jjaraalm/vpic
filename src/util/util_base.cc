@@ -251,11 +251,20 @@ util_free_aligned( void * mem_ref ) {
 
 void
 log_printf( const char *fmt, ... ) {
-  va_list ap;
-  va_start( ap, fmt );
-  vfprintf( stderr, fmt, ap );
-  va_end( ap );
-  fflush( stderr );
+  size_t len;
+  va_list ap1, ap2;
+  va_start( ap1, fmt );
+
+  // Get the length of the output string.
+  va_copy( ap2, ap1 );
+  len = vsnprintf( NULL, 0, fmt, ap2 ) + 1;
+  va_end( ap2 );
+
+  // Write the output.
+  char str[len];
+  vsprintf( str, fmt, ap1 );
+  std::cerr << str << std::flush;
+  va_end( ap1 );
 }
 
 uint32_t
@@ -264,4 +273,3 @@ _nanodelay( uint32_t i ) {
   for( ; i; i-- ) a^=0xdeadbeef, a>>=1;
   return a;
 }
-
