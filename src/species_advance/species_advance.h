@@ -31,6 +31,9 @@ BEGIN_C_DECLS
 int
 num_species( const species_t * sp_list );
 
+species_t *
+next_species( species_t * sp_list );
+
 void
 delete_species_list( species_t * sp_list );
 
@@ -41,6 +44,12 @@ find_species_id( species_id id,
 species_t *
 find_species_name( const char * name,
                    species_t * sp_list );
+
+species_id
+get_species_id( const species_t * sp );
+
+const char *
+get_species_name( const species_t * sp );
 
 species_t *
 append_species( species_t * sp,

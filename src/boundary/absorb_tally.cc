@@ -59,16 +59,19 @@ delete_absorb_tally( particle_bc_t * RESTRICT pbc ) {
 /* Publc interface **********************************************************/
 
 particle_bc_t *
-absorb_tally( /**/  species_t      * RESTRICT sp_list,
+absorb_tally( const char           *          name,
+              /**/  species_t      * RESTRICT sp_list,
               const field_array_t  * RESTRICT fa ) {
-  if( !sp_list || !fa ) ERROR(( "Bad args" ));
+  if( !sp_list || !fa || !name ) ERROR(( "Bad args" ));
   absorb_tally_t * at;
   MALLOC( at, 1 );
   at->sp_list = sp_list;
   at->fa      = fa;
   MALLOC( at->tally, num_species( sp_list ) );
-  CLEAR( at->tally, num_species( sp_list ) );  
-  return new_particle_bc_internal( at,
+  CLEAR( at->tally, num_species( sp_list ) );
+  return new_particle_bc_internal( name,
+                                   at,
+                                   absorb_tally_pbc_type,
                                    (particle_bc_func_t)interact_absorb_tally,
                                    delete_absorb_tally,
                                    (checkpt_func_t)checkpt_absorb_tally,
@@ -81,4 +84,3 @@ get_absorb_tally( particle_bc_t * pbc ) {
   if( !pbc ) ERROR(( "Bad args" ));
   return ((absorb_tally_t *)pbc->params)->tally;
 }
-

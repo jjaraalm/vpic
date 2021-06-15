@@ -48,6 +48,27 @@ boot_checkpt( int * pargc,
 void
 halt_checkpt( void );
 
+/* Creates a new registry, activates it, and returns the id */
+
+size_t
+create_registry( void );
+
+/* Deletes a registry */
+
+void
+delete_registry( size_t id );
+
+/* Sets the active registry */
+
+void
+set_active_registry( size_t id );
+
+/* Gets the id of the active registry */
+
+size_t
+get_active_registry( void );
+
+
 /* All objects to be checkpointed need to be registered when they are
    initially created.  The object registers the methods necessary to
    checkpt, restore and reanimate it.  p must be non-NULL (to avoid an
@@ -111,7 +132,7 @@ reanimate_objects( void );
 
 /*****************************************************************************/
 /* Simple checkpt / restore / reanimate primitives */
-                 
+
 /* Checkpt(restore) n bytes from(to) data. */
 
 void
@@ -246,7 +267,7 @@ restore_ptr( void );
    a verbose warnings to the log to help diagnosing (and repairing)
    any issues caused by checkpointing and restoring various
    edge cases above.
-   
+
    It is okay to checkpoint a NULL symbol (it will be restored as a
    NULL). */
 

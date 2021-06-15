@@ -54,6 +54,7 @@ restore_vpic_simulation( void ) {
   RESTORE_FPTR( vpic->particle_bc_list );
   RESTORE_FPTR( vpic->emitter_list );
   RESTORE_FPTR( vpic->collision_op_list );
+  vpic->checkpt_registry_id = get_active_registry();
   return vpic;
 }
 
@@ -73,6 +74,9 @@ reanimate_vpic_simulation( vpic_simulation * vpic ) {
 
 vpic_simulation::vpic_simulation() {
   CLEAR( this, 1 );
+
+  /* Create a registry */
+  checkpt_registry_id = create_registry();
 
   /* Set non-zero defaults */
   verbose = 1;
@@ -101,9 +105,19 @@ vpic_simulation::vpic_simulation() {
 
   n_rng++;
 
-  entropy      = new_rng_pool( n_rng, 0, 0 );
-  sync_entropy = new_rng_pool( n_rng, 0, 1 );
-  grid = new_grid();
+  // Initialize all pointers.
+  entropy             = new_rng_pool( n_rng, 0, 0 );
+  sync_entropy        = new_rng_pool( n_rng, 0, 1 );
+  grid                = new_grid();
+  material_list       = NULL;
+  field_array         = NULL;
+  interpolator_array  = NULL;
+  accumulator_array   = NULL;
+  hydro_array         = NULL;
+  species_list        = NULL;
+  particle_bc_list    = NULL;
+  emitter_list        = NULL;
+  collision_op_list   = NULL;
 
   REGISTER_OBJECT( this, checkpt_vpic_simulation,
                    restore_vpic_simulation, reanimate_vpic_simulation );
@@ -123,4 +137,5 @@ vpic_simulation::~vpic_simulation() {
   delete_grid( grid );
   delete_rng_pool( sync_entropy );
   delete_rng_pool( entropy );
+  delete_registry( checkpt_registry_id );
 }

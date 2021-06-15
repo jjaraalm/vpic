@@ -122,7 +122,7 @@ binary_collision_model( const char * RESTRICT name,
   MALLOC( cm, 1 );
   MALLOC( cm->name, len+1 );
 
-  strcpy( cm->name, name ); 
+  strcpy( cm->name, name );
 
   cm->rate_constant = rate_constant;
   cm->collision     = collision;
@@ -133,7 +133,7 @@ binary_collision_model( const char * RESTRICT name,
   cm->sample        = sample;
   cm->interval      = interval;
 
-  return new_collision_op_internal( cm,
+  return new_collision_op_internal( name, cm, binary_collision_type,
                                     ( collision_op_func_t ) apply_binary_collision_model,
                                     delete_binary_collision_model,
                                     ( checkpt_func_t ) checkpt_binary_collision_model,

@@ -16,6 +16,9 @@ typedef void
 (*delete_emitter_func_t)( emitter_t * RESTRICT e );
 
 struct emitter {
+  char * name;
+  int id;
+  emitter_type type;
   void * params;
   emit_func_t emit;
   delete_emitter_func_t delete_e;
@@ -35,7 +38,9 @@ emitter_t *
 restore_emitter_internal( void * params );
 
 emitter_t *
-new_emitter_internal( void * params,
+new_emitter_internal( const char * name,
+                      void * params,
+                      emitter_type type,
                       emit_func_t emit,
                       delete_emitter_func_t delete_e,
                       checkpt_func_t checkpt,

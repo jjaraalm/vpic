@@ -56,7 +56,8 @@ delete_langevin( collision_op_t * cop )
 /* Public interface **********************************************************/
 
 collision_op_t *
-langevin( float kT,
+langevin( const char * name,
+          float kT,
           float nu,
           species_t * RESTRICT sp,
           rng_pool_t * RESTRICT rp,
@@ -66,6 +67,7 @@ langevin( float kT,
 
   if ( !sp    ||
        !rp    ||
+       !name  ||
        kT < 0 ||
        nu < 0 )
   {
@@ -80,7 +82,7 @@ langevin( float kT,
   l->nu       = nu;
   l->interval = interval;
 
-  return new_collision_op_internal( l,
+  return new_collision_op_internal( name, l, langevin_collision_type,
                                     ( collision_op_func_t ) apply_langevin,
                                     delete_langevin,
                                     ( checkpt_func_t ) checkpt_langevin,

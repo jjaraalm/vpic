@@ -18,13 +18,16 @@ typedef struct material {
   material_id id;               // Unique identifier for material
   struct material *next;        // Next material in list
 } material_t;
-  
+
 BEGIN_C_DECLS
 
 // In material.c
 
 int
 num_material( const material_t * m_list );
+
+material_t *
+next_material( material_t * m_list );
 
 void
 delete_material_list( material_t * m_list );
@@ -40,6 +43,9 @@ find_material_name( const char * name,
 material_t *
 append_material( material_t * m,
                  material_t ** m_list );
+
+const char *
+get_material_name( const material_t * m );
 
 material_id
 get_material_id( const material_t * m );

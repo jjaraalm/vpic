@@ -28,12 +28,37 @@ typedef struct emitter emitter_t;
 #define EXTRACT_LOCAL_CELL( component_id )     ((component_id)>>5)
 #define EXTRACT_COMPONENT_TYPE( component_id ) ((component_id)&31)
 
+enum emitter_type {
+  unknown_emitter_type        = 0,
+  child_langmuir_emitter_type = 1
+};
+
 BEGIN_C_DECLS
 
 // In emitter.c
 
 int
 num_emitter( const emitter_t * e_list );
+
+emitter_t *
+next_emitter( emitter_t  * e_list );
+
+emitter_t *
+find_emitter_name( const char * name,
+                   emitter_t  * e_list );
+
+emitter_t *
+find_emitter_id( int          id,
+                 emitter_t  * e_list );
+
+const char *
+get_emitter_name( const emitter_t  * e );
+
+int
+get_emitter_id( const emitter_t  * e );
+
+emitter_type
+get_emitter_type( const emitter_t  * e );
 
 void
 apply_emitter_list( emitter_t * e_list );
@@ -44,7 +69,7 @@ delete_emitter_list( emitter_t * e_list );
 // Note that this append is hacked to silently return if the given
 // emitter is already part of the list.  This allows the emitter
 // initialization in vpic.h / deck_wrappers.cxx to get around
-// some limitations of strict C++. 
+// some limitations of strict C++.
 
 emitter_t *
 append_emitter( emitter_t * e,
@@ -64,7 +89,8 @@ size_emitter( emitter_t * e,
 #define IVORY          sqrt(1./6.)
 
 emitter_t *
-child_langmuir( /**/  species_t            * RESTRICT sp,  // Species to emit
+child_langmuir( const char                 *          name,
+                /**/  species_t            * RESTRICT sp,  // Species to emit
                 const interpolator_array_t * RESTRICT ia,  // For field interpolation
                 /**/  field_array_t        * RESTRICT fa,  // For rhob accum (inject)
                 /**/  accumulator_array_t  * RESTRICT aa,  // For Jf accum (aging)

@@ -66,7 +66,7 @@ takizuka_abe( const char       * RESTRICT name,
   cm->cvar0      = cvar0;
   cm->interval = interval;
 
-  return new_collision_op_internal( cm,
+  return new_collision_op_internal( name, cm, takizuka_abe_collision_type,
                                     (collision_op_func_t)apply_takizuka_abe,
                                     delete_takizuka_abe,
                                     (checkpt_func_t)checkpt_takizuka_abe,

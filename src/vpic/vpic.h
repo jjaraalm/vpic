@@ -126,7 +126,7 @@ public:
   int advance( void );
   void finalize( void );
 
-protected:
+  size_t checkpt_registry_id;
 
   // Directly initialized by user
 

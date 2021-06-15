@@ -15,12 +15,40 @@
 struct collision_op;
 typedef struct collision_op collision_op_t;
 
+enum collision_op_type {
+  unknown_collision_type                    = 0,
+  takizuka_abe_collision_type               = 1,
+  langevin_collision_type                   = 2,
+  unary_collision_type                      = 3,
+  binary_collision_type                     = 4
+};
+
 BEGIN_C_DECLS
 
 /* In collision.c */
 
 int
 num_collision_op( const collision_op_t * RESTRICT cop_list );
+
+collision_op_t *
+next_collision_op( collision_op_t * cop_list );
+
+collision_op_t *
+find_collision_op_name( const char     * name,
+                        collision_op_t * cop_list );
+
+collision_op_t *
+find_collision_op_id( int              id,
+                      collision_op_t * cop_list );
+
+const char *
+get_collision_op_name( const collision_op_t * cop );
+
+int
+get_collision_op_id( const collision_op_t * cop );
+
+collision_op_type
+get_collision_op_type( const collision_op_t * cop );
 
 void
 apply_collision_op_list( collision_op_t * RESTRICT cop_list );

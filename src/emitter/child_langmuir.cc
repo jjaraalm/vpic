@@ -173,7 +173,8 @@ delete_child_langmuir( emitter_t * e ) {
 /* Public interface **********************************************************/
 
 emitter_t *
-child_langmuir( /**/  species_t            * RESTRICT sp,
+child_langmuir( const char                 *          name,
+                /**/  species_t            * RESTRICT sp,
                 const interpolator_array_t * RESTRICT ia,
                 /**/  field_array_t        * RESTRICT fa,
                 /**/  accumulator_array_t  * RESTRICT aa,
@@ -185,7 +186,7 @@ child_langmuir( /**/  species_t            * RESTRICT sp,
                 float norm ) {
   child_langmuir_t * cl;
 
-  if( !sp || !ia || !fa || !aa || !rp ||
+  if( !sp || !ia || !fa || !aa || !rp || !name ||
       sp->g!=ia->g || sp->g!=fa->g || sp->g!=aa->g ||
       n_emit_per_face<1 || ut_para<0  || ut_perp<0 || thresh_e_norm<0 )
     ERROR(( "Bad args" ));
@@ -201,7 +202,9 @@ child_langmuir( /**/  species_t            * RESTRICT sp,
   cl->ut_perp         = ut_perp;
   cl->thresh_e_norm   = thresh_e_norm;
   cl->norm            = norm;
-  return new_emitter_internal( cl,
+  return new_emitter_internal( name,
+                               cl,
+                               child_langmuir_emitter_type,
                                (emit_func_t)emit_child_langmuir,
                                delete_child_langmuir,
                                (checkpt_func_t)checkpt_child_langmuir,

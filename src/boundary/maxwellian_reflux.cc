@@ -58,7 +58,7 @@ typedef struct maxwellian_reflux {
 int
 interact_maxwellian_reflux( maxwellian_reflux_t * RESTRICT mr,
                             species_t           * RESTRICT sp,
-                            particle_t          * RESTRICT p, 
+                            particle_t          * RESTRICT p,
                             particle_mover_t    * RESTRICT pm,
                             particle_injector_t * RESTRICT pi,
                             int                            max_pi,
@@ -67,18 +67,18 @@ interact_maxwellian_reflux( maxwellian_reflux_t * RESTRICT mr,
   /**/  rng_t  * RESTRICT rng = mr->rng;
 
   const int32_t sp_id   = sp->id;
-  const float   ut_para = mr->ut_para[sp_id]; 
+  const float   ut_para = mr->ut_para[sp_id];
   const float   ut_perp = mr->ut_perp[sp_id];
 
   float u[3];                // u0 = para, u1 & u2 = perp
   float ux, uy, uz;          // x, y, z normalized momenta
   float dispx, dispy, dispz; // Particle displacement
-  float ratio;  
+  float ratio;
 
-  /**/                      // axis x  y  z 
+  /**/                      // axis x  y  z
   static const int perm[6][3] = { { 0, 1, 2 },   // -x face
                                   { 2, 0, 1 },   // -y face
-                                  { 1, 2, 0 },   // -z face 
+                                  { 1, 2, 0 },   // -z face
                                   { 0, 1, 2 },   // +x face
                                   { 2, 0, 1 },   // +y face
                                   { 1, 2, 0 } }; // +z face
@@ -91,22 +91,22 @@ interact_maxwellian_reflux( maxwellian_reflux_t * RESTRICT mr,
   // ub^2)) where u is the || speed and ub is the thermal speed.  In a
   // time delta t, if the boundary has surface area delta A, there
   // will be
-  //   
+  //
   //   p_inj(u) du ~ u exp(-u^2/(2 ub^2)) (delta t)(delta A) du
-  //   
+  //
   // particles injected from the boundary between speeds u and
   // u+du. p_inj(u) is the distribution function we wish to sample.
   // It has a cumulative i distribution function
-  //   
+  //
   //   cdf(u) = \int_0^u du p_inj(u) = 1 - exp(-u^2/(2 ub^2))
-  //   
+  //
   // (I've adjusted the constants out front to give a proper cdf
   // ranging from 0 to 1, the range of h).
-  //   
+  //
   // Let mu be a uniformly distributed random number from 0 to 1.
   // Setting cdf(u)=mu and solving for u gives the means for sampling
   // u:
-  //   
+  //
   //   exp(-u^2/(2 ub^2)) = mu - 1 = mu
   //
   // (Note that 1-mu has same dist as mu.)  This implies that
@@ -117,7 +117,7 @@ interact_maxwellian_reflux( maxwellian_reflux_t * RESTRICT mr,
   // number.
 
   // Note: This assumes ut_para > 0
-  
+
   u[0] = ut_para*scale[face]*sqrtf(frande(rng));
   u[1] = ut_perp*frandn(rng);
   u[2] = ut_perp*frandn(rng);
@@ -209,9 +209,10 @@ delete_maxwellian_reflux( particle_bc_t * RESTRICT pbc ) {
 /* Public interface *********************************************************/
 
 particle_bc_t *
-maxwellian_reflux( species_t  * RESTRICT sp_list,
+maxwellian_reflux( const char *          name,
+                   species_t  * RESTRICT sp_list,
                    rng_pool_t * RESTRICT rp ) {
-  if( !sp_list || !rp ) ERROR(( "Bad args" ));
+  if( !sp_list || !rp || !name ) ERROR(( "Bad args" ));
   maxwellian_reflux_t * mr;
   MALLOC( mr, 1 );
   mr->sp_list = sp_list;
@@ -220,7 +221,9 @@ maxwellian_reflux( species_t  * RESTRICT sp_list,
   MALLOC( mr->ut_perp, num_species( mr->sp_list ) );
   CLEAR( mr->ut_para, num_species( mr->sp_list ) );
   CLEAR( mr->ut_perp, num_species( mr->sp_list ) );
-  return new_particle_bc_internal( mr,
+  return new_particle_bc_internal( name,
+                                   mr,
+                                   maxwellian_reflux_pbc_type,
                                    (particle_bc_func_t)interact_maxwellian_reflux,
                                    delete_maxwellian_reflux,
                                    (checkpt_func_t)checkpt_maxwellian_reflux,
@@ -239,4 +242,3 @@ set_reflux_temp( /**/  particle_bc_t * RESTRICT pbc,
   mr->ut_para[sp->id] = ut_para;
   mr->ut_perp[sp->id] = ut_perp;
 }
-

@@ -37,12 +37,20 @@ typedef struct registry {
   struct registry * next;
 } registry_t;
 
-static registry_t * registry = NULL;
+typedef struct registry_list {
+  size_t id;
+  size_t next_id;
+  registry_t * registry;
+  struct registry_list * next;
+} registry_list_t;
+
+static registry_list_t * registry_list = NULL;
+static registry_list_t * active_registry = NULL;
 
 /* Counter used to dole out unique ids.  Zero ids are used to indicate
    an error condition. */
 
-static size_t next_id = 1;
+static size_t next_list_id = 1;
 
 #ifdef VERBOSE_CHECKPOINTING
 
@@ -74,7 +82,7 @@ dump_node( registry_t * node ) {
 }
 
 static void
-dump_registry( void ) {
+dump_registry( registry_t * registry ) {
   registry_t * node;
   for( node=registry; node; node=node->next ) dump_node( node );
 }
@@ -86,7 +94,7 @@ dump_node( registry_t * node ) {
 }
 
 static void
-dump_registry( void ) {
+dump_registry( registry_t * registry ) {
 }
 
 #endif
@@ -101,10 +109,14 @@ boot_checkpt( int * pargc,
 
   /* Initialize the checkpt service state */
 
-  registry = NULL;
-  checkpt  = NULL;
-  restore  = NULL;
-  next_id  = 1;
+  registry_list = NULL;
+  checkpt       = NULL;
+  restore       = NULL;
+  next_list_id  = 0;
+
+  /* Create registry 0 for global services. */
+
+  create_registry();
 
   /* Mark the service as booted */
 
@@ -117,9 +129,11 @@ halt_checkpt( void ) {
   /* Check input args */
 
   if( !booted  ) ERROR(( "checkpt service not booted." ));
-  if( registry ) {
-    dump_registry();
-    ERROR(( "halt called with some objects still registered" ));
+  for( registry_list_t * r=registry_list; r; r=r->next ) {
+    if( r->registry ) {
+      dump_registry( r->registry );
+      ERROR(( "halt called with some objects still registered" ));
+    }
   }
   if( checkpt  ) ERROR(( "currently writing a checkpt" ));
   if( restore  ) ERROR(( "currently reading a checkpt" ));
@@ -129,6 +143,94 @@ halt_checkpt( void ) {
   booted = 0;
 }
 
+registry_list_t *
+get_registry_id( size_t id ) {
+
+  for( registry_list_t * r=registry_list; r; r=r->next ) {
+    if( r->id == id ) {
+      return r;
+    }
+  }
+
+  ERROR(( "registry id \"%d\" not found", id ));
+
+}
+
+size_t
+create_registry( void ) {
+
+  registry_list_t * r;
+  MALLOC(r, 1);
+  r->id       = next_list_id;
+  r->next_id  = registry_list ? get_registry_id(0)->next_id : 1 ;
+  r->registry = NULL;
+  r->next     = registry_list;
+
+  next_list_id += 1;
+  registry_list = r;
+
+  set_active_registry( r-> id );
+
+  return r->id;
+
+}
+
+void
+delete_registry( size_t id ) {
+
+  registry_list_t * prev = NULL;
+  for( registry_list_t * r=registry_list; r; r=r->next ) {
+
+    if( r->id == id ) {
+
+      if( r->registry ) {
+        dump_registry( r->registry );
+        ERROR(( "delete registry called with some objects still registered" ));
+      }
+
+      if( !prev ) {
+        registry_list = r->next;
+      } else {
+        prev->next = r->next;
+      }
+
+      if( r == active_registry ) {
+        set_active_registry( 0 );
+      }
+
+      FREE(r);
+      return;
+
+    }
+
+    prev = r;
+
+  }
+
+  ERROR(( "registry id \"%d\" not found", id ));
+
+}
+
+void
+set_active_registry( size_t id ) {
+  active_registry = get_registry_id( id );
+}
+
+size_t
+get_active_registry( void ) {
+  return active_registry->id;
+}
+
+size_t
+num_objects( registry_t * r ) {
+  size_t count = 0;
+  for( ; r ; r=r->next) {
+    ++count;
+  }
+  return count;
+}
+
+
 size_t
 object_id( const void * obj ) {
   registry_t * node;
@@ -136,9 +238,10 @@ object_id( const void * obj ) {
   /* Check input args */
 
   if( !booted ) ERROR(( "checkpt service not booted" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Search the registry for the object */
-
+  registry_t * registry = active_registry->registry;
   for( node=registry; node; node=node->next )
     if( node->obj==obj ) break;
 
@@ -154,9 +257,10 @@ object_ptr( size_t id ) {
   /* Check input args */
 
   if( !booted ) ERROR(( "checkpt service not booted" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Search the registry for the id */
-
+  registry_t * registry = active_registry->registry;
   for( node=registry; node; node=node->next )
     if( node->id==id ) break;
 
@@ -183,19 +287,20 @@ void register_object(
   if( !booted ) ERROR(( "checkpt service not booted" ));
   if( checkpt ) ERROR(( "currently writing a checkpt" ));
   if( restore ) ERROR(( "currently reading a checkpt" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Check that obj is valid and that obj isn't already registered.
      At the same time, find the last entry in the registry. */
 
   if( !obj ) ERROR(( "NULL obj" ));
-  for( prev=NULL, node=registry; node; prev=node, node=node->next )
+  for( prev=NULL, node=active_registry->registry; node; prev=node, node=node->next )
     if( node->obj==obj ) break;
   if( node ) ERROR(( "object already registered" ));
-  
+
   /* Create the registry entry for this object */
 
   MALLOC( node, 1 );
-  node->id             = next_id++;
+  node->id             = active_registry->next_id++;
   node->obj            = obj;
   node->checkpt_func   = checkpt_func;
   node->restore_func   = restore_func;
@@ -205,7 +310,7 @@ void register_object(
   /* And append it to the end of the registry */
 
   if( prev ) prev->next = node;
-  if( !registry ) registry = node;
+  if( !active_registry->registry ) active_registry->registry = node;
 }
 
 void
@@ -217,17 +322,18 @@ unregister_object( void * obj ) {
   if( !booted ) ERROR(( "checkpt service not booted" ));
   if( checkpt ) ERROR(( "currently writing a checkpt" ));
   if( restore ) ERROR(( "currently reading a checkpt" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Find the entry for this object in the register and the previous
      entry.  If the object is not registered, return an error */
 
-  for( prev=NULL, node=registry; node; prev=node, node=node->next )
+  for( prev=NULL, node=active_registry->registry; node; prev=node, node=node->next )
     if( node->obj==obj ) break;
   if( !node ) ERROR(( "object was not registered" ));
 
   /* Remove the node from the registry */
 
-  if( node==registry ) registry = node->next;
+  if( node==active_registry->registry ) active_registry->registry = node->next;
   if( prev ) prev->next = node->next;
   node->next = NULL;
 
@@ -245,15 +351,32 @@ checkpt_objects( const char * name ) {
   if( !booted ) ERROR(( "checkpt not booted" ));
   if( checkpt ) ERROR(( "currently writing a checkpt" ));
   if( restore ) ERROR(( "currently reading a checkpt" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Open the checkpt serialization stream */
 
   checkpt = checkpt_open_wronly( name );
-  CHECKPT_VAL( size_t, next_id );
 
-  /* Checkpoint the objects */
+  /* Checkpoint the global objects */
 
-  for( node=registry; node; node=node->next ) {
+  registry_t * global_registry = get_registry_id( 0 )->registry;
+  size_t num_global_objects = num_objects( global_registry );
+  CHECKPT_VAL( size_t, num_global_objects );
+
+  for ( node=global_registry; node; node=node->next ) {
+    dump_node( node );
+    CHECKPT_VAL( size_t, 0x600DF00D );
+    checkpt_raw( node, sizeof(*node) );
+    checkpt_sym( (void *)(size_t)node->checkpt_func   );
+    checkpt_sym( (void *)(size_t)node->restore_func   );
+    checkpt_sym( (void *)(size_t)node->reanimate_func );
+    if( node->checkpt_func ) node->checkpt_func( node->obj );
+  }
+
+  /* Checkpoint the active objects */
+
+  CHECKPT_VAL( size_t, active_registry->next_id );
+  for( node=active_registry->registry; node; node=node->next ) {
     dump_node( node );
     CHECKPT_VAL( size_t, 0x600DF00D );
     checkpt_raw( node, sizeof(*node) );
@@ -266,7 +389,7 @@ checkpt_objects( const char * name ) {
   /* Mark that there are no more objects in the stream, close the
      serialization stream and indicate that we are no longer writing a
      checkpt */
-  
+
   CHECKPT_VAL( size_t, 0xBADF00D );
   checkpt_close( checkpt );
   checkpt = NULL;
@@ -277,30 +400,69 @@ restore_objects( const char * name ) {
   registry_t * node, * prev;
   size_t prefix;
 
-  /* Check input args */
+  // Create a registry to hold the newly restored objects
+  create_registry();
 
+  /* Check input args */
   if( !booted ) ERROR(( "checkpt not booted" ));
   if( checkpt ) ERROR(( "currently writing a checkpt" ));
   if( restore ) ERROR(( "currently reading a checkpt" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Delete all objects in the in favor of the checkpointed objects */
 
-  node = registry;
+  node = active_registry->registry;
   while( node ) {
     prev = node;
     node = node->next;
     FREE( prev );
   }
-  registry = NULL;
-  next_id = 0;
+  active_registry->registry = NULL;
+  active_registry->next_id  = 0;
 
   /* Open the checkpt deserialization stream */
 
   restore = checkpt_open_rdonly( name );
-  RESTORE_VAL( size_t, next_id );
+
+  /* Restore the global objects. They do NOT get added to the new registry. */
+
+  size_t num_global_objects ;
+  registry_t * global_registry = get_registry_id( 0 )->registry;
+
+  RESTORE_VAL( size_t, num_global_objects );
+  if (num_global_objects != num_objects( global_registry ));
+    ERROR(( "Cannot load checkpt (different number of global objects)" ));
+
+  for(; num_global_objects ; --num_global_objects) {
+    RESTORE_VAL( size_t, prefix );
+    if( prefix!=0x600DF00D )
+      ERROR(( "Malformed checkpt (expected an object header)" ));
+
+    /* Load the checkpointed global */
+    MALLOC( node, 1 );
+    restore_raw( node, sizeof(*node) );
+    node->checkpt_func   = (checkpt_func_t)  (size_t)restore_sym();
+    node->restore_func   = (restore_func_t)  (size_t)restore_sym();
+    node->reanimate_func = (reanimate_func_t)(size_t)restore_sym();
+    node->next = NULL;
+    dump_node( node );
+
+    /* Validate against current global */
+    if(    global_registry->id             != node->id
+        || global_registry->checkpt_func   != node->checkpt_func
+        || global_registry->restore_func   != node->restore_func
+        || global_registry->reanimate_func != node->reanimate_func )
+      ERROR(( "Cannot load checkpt (global object mismatch)" ));
+
+    /* Call restore func to further validate. */
+    if( node->restore_func ) node->obj = node->restore_func();
+    global_registry = global_registry->next;
+    FREE( node );
+  }
 
   /* Restore the objects */
 
+  RESTORE_VAL( size_t, active_registry->next_id );
   prev = NULL;
   for(;;) {
     RESTORE_VAL( size_t, prefix );
@@ -313,7 +475,7 @@ restore_objects( const char * name ) {
     node->restore_func   = (restore_func_t)  (size_t)restore_sym();
     node->reanimate_func = (reanimate_func_t)(size_t)restore_sym();
     node->next = NULL;
-    if( !registry ) registry = node;
+    if( !active_registry->registry ) active_registry->registry = node;
     if( prev ) prev->next = node;
     prev = node;
     dump_node( node );
@@ -336,10 +498,11 @@ reanimate_objects( void ) {
   if( !booted ) ERROR(( "checkpt not booted" ));
   if( checkpt ) ERROR(( "currently writing a checkpt" ));
   if( restore ) ERROR(( "currently reading a checkpt" ));
+  if( !active_registry ) ERROR(( "no active registry" ));
 
   /* Call each objects reanimate function */
 
-  for( node=registry; node; node=node->next ) {
+  for( node=active_registry->registry; node; node=node->next ) {
     dump_node( node );
     if( node->reanimate_func ) node->reanimate_func( node->obj );
   }
@@ -432,7 +595,7 @@ restore_data( void ) {
 
 void
 checkpt_str( const char * str ) {
-  
+
   /* If str is NULL, write a NULL string header to the stream.
      Otherwise, write a non-NULL string header and the string itself
      (not including the terminating '\0'). */
@@ -545,12 +708,12 @@ checkpt_sym( const void * saddr ) {
   /* If symbol address is NULL, checkpoint a NULL symbol header.
      Otherwise, write a address symbol header and the symbol
      address. */
-  
+
   if( !saddr ) CHECKPT_VAL( size_t, 0x2C11513B );
   else {
     static int first_time = 1;
     if( first_time ) {
-      if( !world_rank ) 
+      if( !world_rank )
         WARNING(( "Checkpointing was compiled without reverse symbol table "
                   "lookup support and has been asked to checkpoint at least "
                   "one symbol.  Checkpointing will likely only work correctly "
@@ -561,7 +724,7 @@ checkpt_sym( const void * saddr ) {
     }
 
     CHECKPT_VAL( size_t, 0xADD7513B  );
-    CHECKPT_VAL( const void *, saddr );    
+    CHECKPT_VAL( const void *, saddr );
   }
 }
 
@@ -575,13 +738,13 @@ restore_sym( void ) {
 
   RESTORE_VAL( size_t, type );
   if( type==0x2C11513B ) return NULL; /* NULL symbol header */
-  if( type!=0xADD7513B ) 
+  if( type!=0xADD7513B )
     ERROR(( "Malformed checkpt (expected symbol header)" ));
 
   /* Read the symbol address */
 
   if( first_time ) {
-    if( !world_rank ) 
+    if( !world_rank )
       WARNING(( "Checkpointing was compiled without reverse symbol table "
                 "lookup support and has been asked to restore at least one "
                 "symbol.  Checkpointing will likely only work correctly if "
@@ -608,7 +771,7 @@ find_saddr( const char * sname,
   /* If we aren't given a symbol name, return not found */
 
   if( !sname ) return NULL;
-  
+
   /* Note that the default library search path (RTLD_DEFAULT) includes
      the application itself.  The application should be linked with
      with the global symbol table exported (e.g. "-rdynamic" under
@@ -650,7 +813,7 @@ checkpt_sym( const void * saddr ) {
   const char * err;
 
   /* If the symbol is NULL, checkpoint a NULL symbol header */
-  
+
   if( !saddr ) {
     CHECKPT_VAL( size_t, 0x2C11513B );
     return;
@@ -696,7 +859,7 @@ checkpt_sym( const void * saddr ) {
 
     CHECKPT_VAL( size_t, 0xADD7513B  );
     CHECKPT_VAL( const void *, saddr );
-    
+
   }
 }
 
@@ -732,7 +895,7 @@ restore_sym( void ) {
 
     /* Find the symbol's address */
 
-    saddr = find_saddr( sname, fname );   
+    saddr = find_saddr( sname, fname );
     if( !saddr )
       ERROR(( "Unable to resolve the symbol \"%s\" (from \"%s\") in the "
               "current symbol table.  When this symbol was written, it was "
@@ -756,7 +919,7 @@ restore_sym( void ) {
     RESTORE_VAL( void *, saddr );
 
     /* Check to see if the symbol address makes any sense currently. */
-    
+
     dlerror();
     dladdr( saddr, dli );
     err = dlerror();

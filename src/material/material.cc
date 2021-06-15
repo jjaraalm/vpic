@@ -1,4 +1,4 @@
-/* 
+/*
  * Written by:
  *   Kevin J. Bowers, Ph.D.
  *   Plasma Physics Group (X-1)
@@ -42,6 +42,11 @@ num_material( const material_t * m_list ) {
   return m_list ? m_list->id+1 : 0;
 }
 
+material_t *
+next_material( material_t * m_list ) {
+  return m_list ? m_list->next : NULL;
+}
+
 void
 delete_material_list( material_t * m_list ) {
   material_t * m;
@@ -53,7 +58,7 @@ delete_material_list( material_t * m_list ) {
 }
 
 material_t *
-find_material_name( const char * name, 
+find_material_name( const char * name,
                     material_t * m_list ) {
   material_t * m;
   if( !name ) return NULL;
@@ -62,11 +67,16 @@ find_material_name( const char * name,
 }
 
 material_t *
-find_material_id( material_id id, 
+find_material_id( material_id id,
                   material_t * m_list ) {
   material_t * m;
   LIST_FIND_FIRST( m, m_list, m->id==id );
   return m;
+}
+
+const char *
+get_material_name( const material_t * m ) {
+  return m ? m->name : "";
 }
 
 material_id
@@ -112,4 +122,3 @@ material( const char * name,
   REGISTER_OBJECT( m, checkpt_material, restore_material, NULL );
   return m;
 }
-

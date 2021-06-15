@@ -1,4 +1,4 @@
-/* 
+/*
  * Written by:
  *   Kevin J. Bowers, Ph.D.
  *   Plasma Physics Group (X-1)
@@ -61,6 +61,12 @@ num_species( const species_t * sp_list )
   return sp_list ? sp_list->id+1 : 0;
 }
 
+species_t *
+next_species( species_t * sp_list )
+{
+  return sp_list ? sp_list->next : NULL;
+}
+
 void
 delete_species_list( species_t * sp_list )
 {
@@ -89,6 +95,18 @@ find_species_name( const char * name,
   if( !name ) return NULL;
   LIST_FIND_FIRST( sp, sp_list, strcmp( sp->name, name )==0 );
   return sp;
+}
+
+species_id
+get_species_id( const species_t * sp )
+{
+  return sp ? sp->id : -1;
+}
+
+const char *
+get_species_name( const species_t * sp )
+{
+  return sp ? sp->name : "";
 }
 
 species_t *
@@ -146,7 +164,7 @@ species( const char * name,
   sp->sort_out_of_place = sort_out_of_place;
   MALLOC_ALIGNED( sp->partition, g->nv+1, 128 );
 
-  sp->g = g;   
+  sp->g = g;
 
   /* id, next are set by append species */
 

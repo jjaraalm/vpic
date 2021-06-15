@@ -249,7 +249,7 @@ util_free_aligned( void * mem_ref ) {
 
 /*****************************************************************************/
 
-void
+std::string
 log_printf( const char *fmt, ... ) {
   size_t len;
   va_list ap1, ap2;
@@ -265,6 +265,8 @@ log_printf( const char *fmt, ... ) {
   vsprintf( str, fmt, ap1 );
   std::cerr << str << std::flush;
   va_end( ap1 );
+
+  return std::string(str);
 }
 
 uint32_t

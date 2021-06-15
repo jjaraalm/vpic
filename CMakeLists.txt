@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.1)
 # VPIC project configuration
 #~----------------------------------------------------------------------------~#
 
-project(vpic)
+project(vpic LANGUAGES C CXX)
 
 #------------------------------------------------------------------------------#
 # Quiet newer versions of cmake about MPI_ROOT
@@ -22,7 +22,7 @@ endif()
 # If a C++11 compiler is available, then set the appropriate flags
 #------------------------------------------------------------------------------#
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #------------------------------------------------------------------------------#
@@ -51,6 +51,10 @@ option(ENABLE_UNIT_TESTS "Enable unit tests" OFF)
 option(ENABLE_LONG_TESTS "Enable longer running tests, often skipped for most CI builds" OFF)
 
 option(ENABLE_PERFORMANCE_TESTS "Enable performance tests" OFF)
+
+option(ENABLE_SIMD_DETECTION "Automatically chooses vectorization strategy" OFF)
+
+option(ENABLE_PYTHON "Builds the VPIC python bindings" OFF)
 
 option(USE_OPENMP "Use OpenMP" OFF)
 
@@ -91,6 +95,60 @@ option(DISABLE_DYNAMIC_RESIZING "Prevent particle arrays from dynamically resizi
 # option to set minimum number of particles
 set(SET_MIN_NUM_PARTICLES AUTO CACHE STRING "Select minimum number of particles to use, if using dynamic particle array resizing")
 
+
+#------------------------------------------------------------------------------#
+# SIMD Feature Detection
+#------------------------------------------------------------------------------#
+
+macro(simd_detect simd_level simd_kind)
+  if(NOT USE_${simd_level})
+
+    string(TOLOWER ${simd_level} level)
+    string(TOLOWER ${simd_kind} kind)
+
+    message(STATUS "Testing for ${level} ${kind} support")
+
+    try_compile(USE_${simd_level}_${simd_kind}
+                "${CMAKE_BINARY_DIR}"
+                "${PROJECT_SOURCE_DIR}/src/util/${level}/test/${level}.cc"
+                CMAKE_FLAGS
+                  -DINCLUDE_DIRECTORIES=${PROJECT_SOURCE_DIR}/test/include
+                COMPILE_DEFINITIONS
+                  -DUSE_${simd_level}_${simd_kind}
+                  -DVPIC_USE_PTHREADS
+                )
+
+    if(USE_${simd_level}_${simd_kind})
+      set(USE_${simd_level} True)
+      message(STATUS "Testing for ${level} ${kind} support - found")
+    endif()
+
+  endif()
+endmacro()
+
+if(ENABLE_SIMD_DETECTION)
+
+  # V4 - listed in order of priority
+  set(USE_V4 False)
+  #simd_detect(V4 AVX2) - V4-AVX2 also uses FMA !!
+  simd_detect(V4 AVX)
+  simd_detect(V4 SSE)
+  simd_detect(V4 NEON)
+  simd_detect(V4 ALTIVEC)
+  simd_detect(V4 PORTABLE)
+
+  # V8 - listed in order of priority
+  set(USE_V8 False)
+  simd_detect(V8 AVX2)
+  simd_detect(V8 AVX)
+  simd_detect(V8 PORTABLE)
+
+  # V16 - listed in order of priority
+  set(USE_V16 False)
+  simd_detect(V16 AVX512)
+  simd_detect(V16 PORTABLE)
+
+endif()
 
 #------------------------------------------------------------------------------#
 # Create include and link aggregates
@@ -222,7 +280,7 @@ endif(USE_V4_NEON)
 
 #------------------------------------------------------------------------------#
 # Add options for building with v8 simd vector support.
-#------------------------------------------------------------------------------#
+#-------------------------------------------------------------------------lan-----#
 
 set(USE_V8)
 
@@ -287,6 +345,10 @@ endif()
 #------------------------------------------------------------------------------#
 # Miscellaneous options.
 #------------------------------------------------------------------------------#
+
+if(ENABLE_PYTHON)
+  set(VPIC_CXX_FLAGS "${VPIC_CXX_FLAGS} -fPIC")
+endif(ENABLE_PYTHON)
 
 if(ENABLE_OPENSSL)
   add_definitions(-DENABLE_OPENSSL)
@@ -399,6 +461,31 @@ if(USER_DECKS)
     endif()
     build_a_vpic(${NAME} ${DECK})
   endforeach()
+endif()
+
+
+#------------------------------------------------------------------------------#
+# Add VPIC python interface
+#------------------------------------------------------------------------------#
+
+if(ENABLE_PYTHON)
+
+  set(PY_INSTALL_DIR "vpic")
+  set(VPIC_PYMOD_NAME "cpp")
+  add_definitions(-DVPIC_PYMOD_NAME=${VPIC_PYMOD_NAME})
+
+  # SKBUILD is set for binary wheel builds, but not with raw cmake
+  if (NOT SKBUILD)
+    set(PY_INSTALL_DIR "lib/vpic")
+  endif()
+
+  add_subdirectory(pybind11)
+  file(GLOB_RECURSE VPIC_PYTHON_SRC interfaces/python/*.cc)
+
+  pybind11_add_module(${VPIC_PYMOD_NAME} ${VPIC_PYTHON_SRC})
+  target_link_libraries(${VPIC_PYMOD_NAME} PUBLIC vpic)
+  install(TARGETS ${VPIC_PYMOD_NAME} LIBRARY COMPONENT python DESTINATION "${PY_INSTALL_DIR}")
+
 endif()
 
 #------------------------------------------------------------------------------#

@@ -33,6 +33,7 @@
 
 #define __STDC_CONSTANT_MACROS
 
+#include <stdexcept> // For runtime_error
 #include <iostream> // For cout, cerr
 #include <ostream>  // For flush
 #include <stdlib.h> // For exit, size_t, NULL
@@ -266,12 +267,12 @@ typedef struct collective collective_t;
     log_printf( "\n" );                                         \
   } while(0)
 
-#define ERROR(args) do {                                      \
+#define ERROR(args) do {                                        \
     log_printf( "Error at " _LOG_HDR "[%i]:\n\t", world_rank ); \
-    log_printf args;                                          \
-    log_printf( "\n" );                                       \
-    nanodelay( 1000000000 ); /* Let the message out */        \
-    exit(1);                                                  \
+    std::string msg = log_printf args;                          \
+    log_printf( "\n" );                                         \
+    throw std::runtime_error( _LOG_HDR "[" + std::to_string(world_rank) + "]: " + msg ); \
+    nanodelay( 1000000000 ); /* Let the message out */          \
   } while(0)
 
 // Element wise (rather than byte wise) mem{cpy,move,set} semantics
@@ -388,9 +389,6 @@ util_malloc_aligned( const char * err_fmt, // Has exactly two %lu in it
 void
 util_free_aligned( void * mem_ref );
 
-void
-log_printf( const char *fmt, ... );
-
 // This function returns a value to prevent the compiler from
 // optimizing it away the function body.  The caller should not use it
 // though so the declaration casts away the return.
@@ -400,5 +398,8 @@ uint32_t
 _nanodelay( uint32_t i );
 
 END_C_DECLS
+
+std::string
+log_printf( const char *fmt, ... );
 
 #endif // _util_base_h_

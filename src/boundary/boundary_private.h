@@ -34,7 +34,9 @@ typedef void
 (*delete_particle_bc_func_t)( particle_bc_t * RESTRICT pbc );
 
 struct particle_bc {
+  char * name;
   void * params;
+  particle_bc_type type;
   particle_bc_func_t interact;
   delete_particle_bc_func_t delete_pbc;
   int64_t id;
@@ -50,7 +52,9 @@ particle_bc_t *
 restore_particle_bc_internal( void * params );
 
 particle_bc_t *
-new_particle_bc_internal( void * params,
+new_particle_bc_internal( const char * name,
+                          void * params,
+                          particle_bc_type type,
                           particle_bc_func_t interact,
                           delete_particle_bc_func_t delete_pbc,
                           checkpt_func_t checkpt,
@@ -63,4 +67,3 @@ delete_particle_bc_internal( particle_bc_t * pbc );
 END_C_DECLS
 
 #endif /* _boundary_h_ */
-

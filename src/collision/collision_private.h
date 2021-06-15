@@ -14,7 +14,10 @@ typedef void
 (*delete_collision_op_func_t) ( struct collision_op * cop );
 
 struct collision_op {
+  char * name;
+  int    id;
   void * params;
+  collision_op_type type;
   collision_op_func_t apply;
   delete_collision_op_func_t delete_cop;
   collision_op_t * next;
@@ -29,7 +32,9 @@ collision_op_t *
 restore_collision_op_internal( void * params );
 
 collision_op_t *
-new_collision_op_internal( void * params,
+new_collision_op_internal( const char * name,
+                           void * params,
+                           collision_op_type type,
                            collision_op_func_t apply,
                            delete_collision_op_func_t delete_cop,
                            checkpt_func_t checkpt,
@@ -48,7 +53,7 @@ typedef struct langevin_pipeline_args
 {
   MEM_PTR( particle_t, 128 ) p;
   MEM_PTR( rng_t,      128 ) rng[ MAX_PIPELINE ];
-  float decay; 
+  float decay;
   float drive;
   int np;
   PAD_STRUCT( (1+MAX_PIPELINE)*SIZEOF_MEM_PTR+2*sizeof(float)+sizeof(int) )
