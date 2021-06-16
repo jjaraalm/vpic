@@ -27,7 +27,9 @@ Simulation::Simulation(vpic_simulation * vsim)
 }
 
 Simulation::~Simulation() {
-  set_active_registry(vsim->checkpt_registry_id);
+  vpic::scoped_acquire_registry reg(vsim);
+  if(reg.id == vsim->checkpt_registry_id)
+    reg.id = 0;
   delete vsim;
 }
 
@@ -39,10 +41,7 @@ Simulation::advance(int          steps,
 
   int current_step;
   bool completed = false;
-
-  // Sanity check.
-  if (!vpic::booted())
-    throw std::runtime_error("VPIC has not been booted.");
+  vpic::scoped_acquire_registry reg(vsim);
 
   // Get rank and disable logging/progress on all but rank 0.
   if (vsim->rank() != 0) {
@@ -146,6 +145,7 @@ void declare_simulation(py::module &m) {
 
     // System lifecycle
     .def("define_units", [](Simulation &s, double cvac, double eps0) {
+        vpic::scoped_acquire_registry reg(s.vsim);
         s.vsim->define_units(cvac, eps0);
       },
       R"pydoc(
@@ -162,6 +162,7 @@ void declare_simulation(py::module &m) {
       py::arg("eps0") = 1.)
 
     .def("define_timestep", [](Simulation &s, double timestep, double start, double step) {
+        vpic::scoped_acquire_registry reg(s.vsim);
         s.vsim->define_timestep(timestep, start, step);
       },
       R"pydoc(
@@ -181,6 +182,7 @@ void declare_simulation(py::module &m) {
       py::arg("step") = 0)
 
     .def("define_field_array", [](Simulation &s, double damp) {
+        vpic::scoped_acquire_registry reg(s.vsim);
         s.vsim->define_field_array(NULL, damp);
       },
       R"pydoc(
@@ -236,6 +238,7 @@ void declare_simulation(py::module &m) {
     .def_property("dt",
       [](Simulation &s) { return s.vsim->grid->dt; },
       [](Simulation &s, double dt) {
+        vpic::scoped_acquire_registry reg(s.vsim);
         s.vsim->define_timestep(dt, s.vsim->grid->t0, s.vsim->grid->step);
       },
       "The timestep.")

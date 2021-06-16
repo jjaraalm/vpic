@@ -22,6 +22,20 @@ namespace vpic {
   bool booted();
 
 
+  struct scoped_acquire_registry {
+    size_t id;
+
+    scoped_acquire_registry(vpic_simulation * vsim) {
+      id = get_active_registry();
+      set_active_registry(vsim->checkpt_registry_id);
+    }
+
+    ~scoped_acquire_registry() {
+      set_active_registry(id);
+    }
+
+  };
+
 }
 
 // Entrypoint for python declerations

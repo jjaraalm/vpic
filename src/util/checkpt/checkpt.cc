@@ -218,6 +218,7 @@ set_active_registry( size_t id ) {
 
 size_t
 get_active_registry( void ) {
+  if( !active_registry ) ERROR(( "no active registry" ));
   return active_registry->id;
 }
 

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "py_proto.h"
 #include "py_simulation.h"
+#include "../util/py_services.h"
 
 // Translation between VPIC and Python types for lists
 // Default is no translation, specializations are located in py_lists.cc
@@ -103,7 +104,7 @@ public:
   }
 
   void append(VPICPrototypeObject<T>& proto) {
-    set_active_registry(vsim->checkpt_registry_id);
+    vpic::scoped_acquire_registry reg(vsim);
     proto(vsim);
   }
 
@@ -124,7 +125,7 @@ private:
   }
 
   void delete_list() {
-    set_active_registry(vsim->checkpt_registry_id);
+    vpic::scoped_acquire_registry reg(vsim);
     delete_vpic_list(*get_vpic_list(vsim));
     *get_vpic_list(vsim) = nullptr;
   }
